@@ -37,7 +37,6 @@ func ObjectNotFound() Panos {
 // Parse attempts to parse an error from the given XML response.
 func Parse(body []byte) error {
 	var e errorCheck
-
 	_ = xml.Unmarshal(body, &e)
 	if e.Failed() {
 		return Panos{

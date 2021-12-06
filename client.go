@@ -125,6 +125,9 @@ type Client struct {
 	rh              []http.Header
 	ri              int
 	authFileContent []byte
+
+	// Client Communication variables.
+	RetriesOnTimeout int `json:retries_on_timeout`
 }
 
 // String is the string representation of a client connection.  Both the
@@ -633,12 +636,25 @@ func (c *Client) Communicate(data url.Values, ans interface{}) ([]byte, http.Hea
 	}
 
 	c.logSend(data)
-
 	body, hdrs, err := c.post(data)
 	if err != nil {
 		return body, hdrs, err
 	}
 
+	// attempt retries for timeout errors
+	for i := 1; i == 1; i++ {
+		body2, hdrs2, err := c.post(data)
+		if err != nil {
+			return body2, hdrs2, err
+		}
+		e2 := errors.Parse(body)
+		pa_error, _ := e2.(errors.Panos)
+		if pa_error.Code == 22 && i < c.RetriesOnTimeout+1 {
+			time.Sleep(1)
+		} else {
+			break
+		}
+	}
 	return body, hdrs, c.endCommunication(body, ans)
 }
 
@@ -1276,6 +1292,21 @@ func (c *Client) initCon() error {
 		return fmt.Errorf("Timeout for %q must be a positive int", c.Hostname)
 	}
 	tout = time.Duration(time.Duration(c.Timeout) * time.Second)
+
+	// Timeout Retries
+	if c.RetriesOnTimeout == 0 {
+		if val := os.Getenv("PANOS_RETRIES_ON_TIMEOUT"); c.CheckEnvironment && val != "" {
+			if ival, err := strconv.Atoi(val); err != nil {
+				return fmt.Errorf("Failed to parse timeout env var as int: %s", err)
+			} else {
+				c.RetriesOnTimeout = ival
+			}
+		} else if json_client.RetriesOnTimeout == 0 {
+			c.RetriesOnTimeout = json_client.RetriesOnTimeout
+		} else {
+			c.RetriesOnTimeout = 1
+		}
+	}
 
 	// Target.
 	if c.Target == "" {
