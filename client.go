@@ -642,7 +642,7 @@ func (c *Client) Communicate(data url.Values, ans interface{}) ([]byte, http.Hea
 	}
 
 	// attempt retries for timeout errors
-	for i := 1; i == 1; i++ {
+	for i := 1; i <= c.RetriesOnTimeout ; i++ {
 		body2, hdrs2, err := c.post(data)
 		if err != nil {
 			return body2, hdrs2, err
